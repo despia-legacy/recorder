@@ -141,9 +141,22 @@ console.log(status.data.state);
 ```javascript
 import despia from 'despia-native';
 
-globalThis.onRecorderState = state => {
-  console.log(state.recordingId, state.state, state.durationMs, state.bytes);
+const previousRecorderState = globalThis.onRecorderState;
+const handleRecorderState = state => {
+  try {
+    if (typeof previousRecorderState === 'function') previousRecorderState(state);
+  } finally {
+    console.log(state.recordingId, state.state, state.durationMs, state.bytes);
+  }
 };
+globalThis.onRecorderState = handleRecorderState;
+const cleanupRecorderState = () => {
+  if (globalThis.onRecorderState !== handleRecorderState) return;
+  if (previousRecorderState === undefined) delete globalThis.onRecorderState;
+  else globalThis.onRecorderState = previousRecorderState;
+};
+// Call cleanupRecorderState() when this component unmounts.
+
 
 const recordingReply = await despia(`extension://recorder/start?upload=${encodeURIComponent(uploadUrl)}`, ['recorderStart']);
 const recording = recordingReply.recorderStart;
