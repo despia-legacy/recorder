@@ -41,19 +41,23 @@ Install the SDK in your web app:
 npm install despia-native
 ```
 
-Copy `example/src/lib/despia-extension.js` to your app's `src/lib/` and adjust the import path if needed. It imports `despia` from `despia-native`, calls the SDK and returns the native answer's `data`. It checks native error envelopes and throws an error with their `code`. The SDK itself resolves native `ok: false` envelopes; it does not reject them. A single watched value becomes `undefined` after 30 seconds, which this helper reports as `sdk_timeout`.
+Call the published SDK directly and watch the exact answer variable declared in `manifest.json`. The SDK resolves to an object keyed by that variable; the native envelope is inside it. Check both a missing reply and `ok: false` before using `data`. Native errors resolve through the SDK; they do not reject its promise. A single watched variable becomes `undefined` after 30 seconds without a reply.
 
-Each helper call forwards a unique native callback into a separate watched value, so overlapping calls do not share response globals. `onExtensionEvent` registers the declared native event callbacks and returns a cleanup function. Events are callbacks, not values you can poll from the SDK proxy.
+Await calls that use the same answer variable sequentially. The SDK's command queue does not correlate concurrent responses. Encode every query value with `encodeURIComponent`, including JSON text. Spaces become `%20`; a literal plus becomes `%2B`. Do not use unmodified `URLSearchParams` form encoding, which uses plus for spaces.
 
-Importing the SDK is safe during server rendering. Run calls and event subscriptions only from browser click handlers or mounted client hooks. React and Vue can use the browser APIs used by this helper; in Next.js and other server-rendered apps, keep these calls in client code. The extension must be included in the installed Despia V3 app; a browser preview has no native extension features.
+Importing the SDK is safe during server rendering. Run native calls only in browser click handlers or mounted client hooks, including client components in Next.js. The extension must be included in the installed Despia V3 app; a browser preview has no native extension features. Optional event handlers use the declared callback on `globalThis`, not an SDK subscription API. Save and restore any callback your app already owns when a component mounts and unmounts.
 
 ## Calling it
 
 ```javascript
-import { extensionCall } from './lib/despia-extension.js';
+import despia from 'despia-native';
 
-const answer = await extensionCall('recorder', 'status');
-console.log(answer);
+const answerReply = await despia('extension://recorder/status', ['recorderStatus']);
+const answer = answerReply.recorderStatus;
+if (answer === undefined) throw new Error('No native reply within 30 seconds');
+if (!answer.ok) throw new Error(answer.code + ': ' + answer.error);
+
+console.log(answer.data);
 ```
 
 Calls use `extension://recorder/<route>?<params>`. Each route answers once, in the page that made the call: the runtime sets the route's answer variable in the page, then calls the route's callback. Only declared parameters are accepted. Keep large data on the native side and pass identifiers through the bridge. A call URL is at most 8192 characters.
@@ -110,27 +114,44 @@ The upload URL is the address the file is sent to with an HTTP `PUT`, with `Cont
 ### Recording lifecycle
 
 ```javascript
-import { extensionCall } from './lib/despia-extension.js';
+import despia from 'despia-native';
 
 // uploadUrl is issued by your server for this recording.
-const recording = await extensionCall('recorder', 'start', { upload: uploadUrl });
-const id = recording.recordingId;
-await extensionCall('recorder', 'stop', { id });
-const state = await extensionCall('recorder', 'status', { id });
-console.log(state.state);
+const recordingReply = await despia(`extension://recorder/start?upload=${encodeURIComponent(uploadUrl)}`, ['recorderStart']);
+const recording = recordingReply.recorderStart;
+if (recording === undefined) throw new Error('No native reply within 30 seconds');
+if (!recording.ok) throw new Error(recording.code + ': ' + recording.error);
+
+const id = recording.data.recordingId;
+const stoppedReply = await despia(`extension://recorder/stop?id=${encodeURIComponent(id)}`, ['recorderStop']);
+const stopped = stoppedReply.recorderStop;
+if (stopped === undefined) throw new Error('No native reply within 30 seconds');
+if (!stopped.ok) throw new Error(stopped.code + ': ' + stopped.error);
+
+const statusReply = await despia(`extension://recorder/status?id=${encodeURIComponent(id)}`, ['recorderStatus']);
+const status = statusReply.recorderStatus;
+if (status === undefined) throw new Error('No native reply within 30 seconds');
+if (!status.ok) throw new Error(status.code + ': ' + status.error);
+
+console.log(status.data.state);
 ```
 
 ### Recording updates
 
 ```javascript
-import { extensionCall, onExtensionEvent } from './lib/despia-extension.js';
+import despia from 'despia-native';
 
-const stopListening = onExtensionEvent('onRecorderState', state => {
+globalThis.onRecorderState = state => {
   console.log(state.recordingId, state.state, state.durationMs, state.bytes);
-});
-const recording = await extensionCall('recorder', 'start', { upload: uploadUrl });
-localStorage.setItem('recordingId', recording.recordingId);
-// Call stopListening() when this page or component unmounts.
+};
+
+const recordingReply = await despia(`extension://recorder/start?upload=${encodeURIComponent(uploadUrl)}`, ['recorderStart']);
+const recording = recordingReply.recorderStart;
+if (recording === undefined) throw new Error('No native reply within 30 seconds');
+if (!recording.ok) throw new Error(recording.code + ': ' + recording.error);
+
+localStorage.setItem('recordingId', recording.data.recordingId);
+// Remove or restore your callback when this page or component unmounts.
 ```
 
 ### Asking for the microphone on Android
@@ -138,13 +159,15 @@ localStorage.setItem('recordingId', recording.recordingId);
 On iOS, `start` shows the microphone prompt itself. On Android it does not. Ask for the microphone from the page first with the standard web API. Despia's Android app turns a web microphone request into the system `RECORD_AUDIO` prompt, when the microphone permission is on for your app:
 
 ```javascript
-async function ensureMicrophone() {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  stream.getTracks().forEach(track => track.stop());
-}
+import despia from 'despia-native';
 
-await ensureMicrophone();
-await extensionCall('recorder', 'start', { upload: uploadUrl });
+const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+stream.getTracks().forEach(track => track.stop());
+
+const recordingReply = await despia(`extension://recorder/start?upload=${encodeURIComponent(uploadUrl)}`, ['recorderStart']);
+const recording = recordingReply.recorderStart;
+if (recording === undefined) throw new Error('No native reply within 30 seconds');
+if (!recording.ok) throw new Error(recording.code + ': ' + recording.error);
 ```
 
 If the user denies it, `getUserMedia` throws and `start` answers `permission_denied`.
@@ -159,7 +182,7 @@ If the user denies it, `getUserMedia` throws and `start` answers `permission_den
 | `discard` | `id` (required)            | `recorderDiscard`, `onRecorderDiscard`| Deletes a stopped recording and its file                                                            |
 | `upload`  | `id`, `upload` (required)  | `recorderUpload`, `onRecorderUpload`  | Sends a saved recording again to a fresh URL, for example after a presigned URL expired             |
 
-Subscribe to `onRecorderState` with `onExtensionEvent`; its payload contains each recording state change.
+Set `globalThis.onRecorderState` to receive recording state notifications. Read `status` for current state after re-entering the page.
 
 ### States
 
