@@ -1,0 +1,27 @@
+{
+  "exposed_components": {
+    "android": [
+      {
+        "enabled": null,
+        "exported": true,
+        "intent_filters": [
+          {
+            "attrs": {},
+            "children": [
+              {
+                "attrs": {
+                  "name": "android.appwidget.action.APPWIDGET_UPDATE"
+                },
+                "tag": "action"
+              }
+            ],
+            "tag": "intent-filter"
+          }
+        ],
+        "name": "despia.ext.recorder.StatusWidgetProvider",
+        "permission": null,
+        "tag": "receiver"
+      }
+    ]
+  }
+}

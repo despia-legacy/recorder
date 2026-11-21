@@ -1,0 +1,221 @@
+{
+  "version": "1.0.0",
+  "bridge": {
+    "routes": [
+      {
+        "name": "start",
+        "params": {
+          "upload": {
+            "type": "https_url",
+            "hosts": [
+              "upload.example.com"
+            ],
+            "required": true
+          }
+        },
+        "output": {
+          "variable": "recorderStart",
+          "callback": "onRecorderStart"
+        }
+      },
+      {
+        "name": "stop",
+        "params": {
+          "id": {
+            "type": "string",
+            "max": 64,
+            "required": true
+          }
+        },
+        "output": {
+          "variable": "recorderStop",
+          "callback": "onRecorderStop"
+        }
+      },
+      {
+        "name": "status",
+        "params": {
+          "id": {
+            "type": "string",
+            "max": 64
+          }
+        },
+        "output": {
+          "variable": "recorderStatus",
+          "callback": "onRecorderStatus"
+        }
+      },
+      {
+        "name": "discard",
+        "params": {
+          "id": {
+            "type": "string",
+            "max": 64,
+            "required": true
+          }
+        },
+        "output": {
+          "variable": "recorderDiscard",
+          "callback": "onRecorderDiscard"
+        }
+      },
+      {
+        "name": "upload",
+        "params": {
+          "id": {
+            "type": "string",
+            "max": 64,
+            "required": true
+          },
+          "upload": {
+            "type": "https_url",
+            "hosts": [
+              "upload.example.com"
+            ],
+            "required": true
+          }
+        },
+        "output": {
+          "variable": "recorderUpload",
+          "callback": "onRecorderUpload"
+        }
+      }
+    ],
+    "events": [
+      {
+        "name": "state",
+        "callback": "onRecorderState",
+        "scope": "document"
+      }
+    ]
+  },
+  "ios": {
+    "app": {
+      "entry_type": "RecorderExtension",
+      "sources": [
+        "ios/app/RecorderExtension.swift",
+        "ios/app/RecorderUploader.swift",
+        "ios/shared/RecorderStatus.swift"
+      ],
+      "frameworks": [
+        "AVFAudio",
+        "WidgetKit"
+      ],
+      "requires": {
+        "usage_descriptions": [
+          "NSMicrophoneUsageDescription"
+        ]
+      },
+      "info_plist": {
+        "UIBackgroundModes": [
+          "audio",
+          "processing"
+        ]
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "nativeext"
+        ]
+      },
+      "lifecycle": [
+        "launch",
+        "scene",
+        "background_task"
+      ],
+      "background_tasks": [
+        "upload"
+      ]
+    },
+    "targets": [
+      {
+        "kind": "widgetkit",
+        "name": "RecorderStatusWidget",
+        "sources": [
+          "ios/targets/RecorderStatusWidget/RecorderStatusWidget.swift"
+        ],
+        "shared_sources": [
+          "ios/shared/RecorderStatus.swift"
+        ],
+        "info_plist": {
+          "NSWidgetDescription": "Recording status"
+        },
+        "entitlements": {
+          "com.apple.security.application-groups": [
+            "nativeext"
+          ]
+        },
+        "deployment_target": "16.6"
+      }
+    ]
+  },
+  "android": {
+    "entry_class": "despia.ext.recorder.RecorderExtension",
+    "requires": {
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "lifecycle": [
+      "application_create"
+    ],
+    "modules": [
+      {
+        "kind": "typed",
+        "name": "recorder",
+        "namespace": "despia.ext.recorder",
+        "sources": [
+          "android/recorder/java/despia/ext/recorder/RecorderExtension.java",
+          "android/recorder/java/despia/ext/recorder/RecorderStore.java",
+          "android/recorder/java/despia/ext/recorder/RecorderOwner.java",
+          "android/recorder/java/despia/ext/recorder/RecorderService.java",
+          "android/recorder/java/despia/ext/recorder/StopReceiver.java",
+          "android/recorder/java/despia/ext/recorder/UploadWorker.java",
+          "android/recorder/java/despia/ext/recorder/StatusWidgetProvider.java"
+        ],
+        "res": [
+          "android/recorder/res/layout/nx_recorder_widget.xml",
+          "android/recorder/res/xml/nx_recorder_widget_info.xml",
+          "android/recorder/res/values/nx_recorder_strings.xml"
+        ],
+        "permissions": [
+          "android.permission.FOREGROUND_SERVICE",
+          "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+          "android.permission.POST_NOTIFICATIONS"
+        ],
+        "components": [
+          {
+            "type": "service",
+            "class": "despia.ext.recorder.RecorderService",
+            "exported": false,
+            "foreground_service_type": [
+              "microphone"
+            ]
+          },
+          {
+            "type": "receiver",
+            "class": "despia.ext.recorder.StopReceiver",
+            "exported": false
+          },
+          {
+            "type": "receiver",
+            "class": "despia.ext.recorder.StatusWidgetProvider",
+            "exported": true,
+            "intent_actions": [
+              "android.appwidget.action.APPWIDGET_UPDATE"
+            ],
+            "meta_data": [
+              {
+                "name": "android.appwidget.provider",
+                "resource": "@xml/nx_recorder_widget_info"
+              }
+            ]
+          }
+        ],
+        "dependencies": [
+          "androidx.core:core:1.18.0",
+          "androidx.work:work-runtime:2.11.2"
+        ]
+      }
+    ]
+  }
+}
