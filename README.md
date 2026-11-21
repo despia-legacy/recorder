@@ -1,6 +1,6 @@
 # Background Recorder
 
-Source preview for Despia V3. This snapshot requires the runtime update currently awaiting release and an approved extension-enabled native build. Uploading these files does not change an installed app.
+Source preview for Despia V3. The runtime update and automatic discovery rollout are awaiting release. Rebuild and install the native app to include these files; uploading them does not change an installed app.
 
 Records audio in the background and uploads it to your server when recording stops.
 
@@ -17,11 +17,11 @@ Use the Despia SDK with React, Vue, Svelte, Next.js, TanStack or HTML5. Projects
 - `manifest.json`: the extension's routes, parameters, events and native files.
 - `ios/` and `android/`: the Swift and Kotlin or Java sources and resources the manifest names.
 - `extensions.example.json`: the entry for `public/despia/extensions.json`.
-- `recorder.policy.json`: the approval policy. It is a file you send to Despia with your approval request, together with the extension files. It is not served from your site and does not go into `public/despia/`.
+- `recorder.policy.json`: the build verification policy. It records declarations used by signed build verification. It is not served from your site and does not go into `public/despia/`.
 
 ## Requirements
 
-- A Despia V3 app with V3 Extensions enabled, and a web app that serves static files from its own HTTPS origin.
+- A Despia V3 app and a web app that serves static files from its own HTTPS origin.
 - The `despia-native` JavaScript SDK (`npm install despia-native`).
 - An upload endpoint that accepts an HTTP `PUT` of the recorded file (a presigned storage URL works well).
 - iOS 16.6 or later for the Lock Screen widget.
@@ -31,7 +31,9 @@ Use the Despia SDK with React, Vue, Svelte, Next.js, TanStack or HTML5. Projects
 1. Copy `manifest.json`, `ios/` and `android/` into `public/despia/recorder/` in your web app. The folder name is the extension id, so pages call `extension://recorder/<route>`. Keep every path inside the folder unchanged, because the manifest names them. (`public/` is the folder your site serves from its root; in SvelteKit, use `static/`.)
 2. Add `"recorder"` to the `extensions` list in `public/despia/extensions.json`. `extensions.example.json` shows the entry. Despia takes app identity from the build configuration.
 3. Set the values listed under "Values to set before you build". Vendor keys and hosts in this repository are placeholders only. Never put a server secret in the manifest or anywhere in your web app.
-4. Request approval and a new native build in Despia, and send `recorder.policy.json` with the request. Despia reviews and approves these exact files before a build includes them, and any change to the manifest or to a native file needs a new approval and a new native build. It cannot be applied over the air.
+4. Rebuild and install the native app with these extension files. Any change to the manifest or native source requires another native build. It cannot be applied over the air.
+
+Signed build verification binds source hashes, dependency pins, app identity and final artifacts. It is separate from human code review and does not require a per-app enrollment switch.
 
 ## JavaScript SDK
 
@@ -82,7 +84,7 @@ Before you build, change these values to your own:
 
 - the upload host `upload.example.com` in both `hosts` lists in `manifest.json`.
 
-Despia reviews and approves these exact files before a build includes them.
+Signed build verification checks the exact files included in the native build.
 
 ---
 
