@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "bridge": {
     "routes": [
       {
@@ -213,7 +213,7 @@
         ],
         "dependencies": [
           "androidx.core:core:1.18.0",
-          "androidx.work:work-runtime:2.11.2"
+          "androidx.work:work-runtime:2.12.0"
         ]
       }
     ]
